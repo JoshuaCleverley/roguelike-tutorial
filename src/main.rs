@@ -97,12 +97,11 @@ fn main() {
         tcod.root.flush();
         tcod.root.wait_for_keypress(true);
         
-        let player = &mut objects[PLAYER];
 
-        previous_player_position = (player.x, player.y);
+        previous_player_position = objects[PLAYER].pos();
 
-        let exit = handle_keys(&mut tcod, &game, &mut objects);
-        if exit {
+        let player_action = handle_keys(&mut tcod, &game, &mut objects);
+        if player_action == PlayerAction::Exit {
             break;
         }
     }
@@ -114,22 +113,37 @@ struct Tcod {
     fov: FovMap,
 }
 
-fn handle_keys(tcod: &mut Tcod, game: &Game, objects: &mut Vec<Object>) -> bool {
+fn handle_keys(tcod: &mut Tcod, game: &Game, objects: &mut Vec<Object>) -> PlayerAction {
     use tcod::input::Key;
 
     let key = tcod.root.wait_for_keypress(true);
-    match key {
-        Key { code: tcod::input::KeyCode::Up,     ..} => move_by( PLAYER,  0, -1, &game.map, objects),
-        Key { code: tcod::input::KeyCode::Down,   ..} => move_by( PLAYER,  0,  1, &game.map, objects),
-        Key { code: tcod::input::KeyCode::Left,   ..} => move_by( PLAYER, -1,  0, &game.map, objects),
-        Key { code: tcod::input::KeyCode::Right,  ..} => move_by( PLAYER,  1,  0, &game.map, objects),
-        Key { code: tcod::input::KeyCode::Escape, ..} => return true,
-        Key { code: tcod::input::KeyCode::Enter, alt: true, ..} => {
+    let player_alive = objects[PLAYER].alive;
+
+    match (key, key.text(), player_alive) {
+        (Key { code: tcod::input::KeyCode::Up, ..}, _, true) => {
+            move_by( PLAYER,  0, -1, &game.map, objects);
+            PlayerAction::TookTurn
+        } 
+        (Key { code: tcod::input::KeyCode::Down, ..}, _, true) => {
+            move_by( PLAYER,  0,  1, &game.map, objects);
+            PlayerAction::TookTurn
+        } 
+        (Key { code: tcod::input::KeyCode::Left, ..}, _, true) => {
+            move_by( PLAYER, -1,  0, &game.map, objects);
+            PlayerAction::TookTurn
+        } 
+        (Key { code: tcod::input::KeyCode::Right, ..}, _, true) => {
+            move_by( PLAYER,  1,  0, &game.map, objects);
+            PlayerAction::TookTurn
+        } 
+        (Key { code: tcod::input::KeyCode::Enter, alt: true, ..},  _, _) => {
             let fullscreen = tcod.root.is_fullscreen();
             tcod.root.set_fullscreen(!fullscreen);
-        },
-        _ => {},
-    } false
+            PlayerAction::DidntTakeTurn
+        } 
+        (Key { code: tcod::input::KeyCode::Escape, ..}, _, _) => PlayerAction::Exit,
+        _ => PlayerAction::DidntTakeTurn,
+    } 
 }
 
 #[derive(Debug)]
@@ -372,4 +386,11 @@ fn is_blocked(x: i32, y: i32, map: &Map, objects: &[Object]) -> bool {
     objects
         .iter()
         .any(|object| object.blocks && object.pos() == (x, y))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum PlayerAction {
+    TookTurn,
+    DidntTakeTurn,
+    Exit,
 }
