@@ -67,6 +67,12 @@ fn main() {
     tcod::system::set_fps(LIMIT_FPS);
 
     let mut player = Object::new(0, 0, '@', "player", WHITE, true);
+    player.fighter = Some(Fighter {
+        max_hp: 30,
+        hp: 30,
+        defense: 2,
+        power: 5,
+    });
     player.alive = true;
 
     let mut objects = vec![player];
@@ -104,6 +110,14 @@ fn main() {
         if player_action == PlayerAction::Exit {
             break;
         }
+
+        if objects[PLAYER].alive && player_action != PlayerAction::DidntTakeTurn {
+            for object in &objects {
+                if (object as *const _) != (&objects[PLAYER] as *const _) {
+                    println!("The {} growls!", object.name);
+                }
+            }
+        }
     }
 }
 
@@ -121,19 +135,19 @@ fn handle_keys(tcod: &mut Tcod, game: &Game, objects: &mut Vec<Object>) -> Playe
 
     match (key, key.text(), player_alive) {
         (Key { code: tcod::input::KeyCode::Up, ..}, _, true) => {
-            move_by( PLAYER,  0, -1, &game.map, objects);
+            player_move_or_attack( 0, -1, game, objects);
             PlayerAction::TookTurn
         } 
         (Key { code: tcod::input::KeyCode::Down, ..}, _, true) => {
-            move_by( PLAYER,  0,  1, &game.map, objects);
+            player_move_or_attack( 0,  1, game, objects);
             PlayerAction::TookTurn
         } 
         (Key { code: tcod::input::KeyCode::Left, ..}, _, true) => {
-            move_by( PLAYER, -1,  0, &game.map, objects);
+            player_move_or_attack( -1,  0, game, objects);
             PlayerAction::TookTurn
         } 
         (Key { code: tcod::input::KeyCode::Right, ..}, _, true) => {
-            move_by( PLAYER,  1,  0, &game.map, objects);
+            player_move_or_attack( 1,  0, game, objects);
             PlayerAction::TookTurn
         } 
         (Key { code: tcod::input::KeyCode::Enter, alt: true, ..},  _, _) => {
@@ -155,6 +169,8 @@ struct Object {
     name: String,
     blocks: bool,
     alive: bool,
+    fighter: Option<Fighter>,
+    ai: Option<Ai>,
 }
 
 impl Object {
@@ -167,6 +183,8 @@ impl Object {
             name: name.into(),
             blocks: blocks,
             alive: false,
+            fighter: None,
+            ai: None,
         }
     }
 
@@ -185,11 +203,39 @@ impl Object {
     }
 }
 
-fn move_by(id: usize, dx: i32, dy: i32, map: &Map, objects: &mut [Object]) {
+fn move_by(id: usize, dx: i32, dy: i32, game: &Game, objects: &mut [Object]) {
     let (x, y) = objects[id].pos();
-    if !is_blocked(x + dx, y + dy, map, objects) {
+    if !is_blocked(x + dx, y + dy, &game.map, objects) {
         objects[id].set_pos(x + dx, y + dy);
     }
+}
+
+fn player_move_or_attack(dx: i32, dy: i32, game: &Game, objects: &mut [Object]) {
+    let x = objects[PLAYER].x + dx;
+    let y = objects[PLAYER].y + dy;
+
+    let target_id = objects.iter().position(|object| object.pos() == (x, y));
+
+    match target_id {
+        Some(target_id) => {
+            println!("The {} laughs as you try to attack them!", objects[target_id].name);
+        }
+        None => {
+            move_by(PLAYER, dx, dy, game, objects);
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Fighter {
+    max_hp: i32,
+    hp: i32,
+    defense: i32,
+    power: i32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum Ai {
+    Basic,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -367,9 +413,25 @@ fn place_objects(room: Rect, map: &Map, objects: &mut Vec<Object>) {
         
         if !is_blocked(x, y, map, objects) {
             let mut monster = if rand::random::<f32>() < 0.8 {
-                Object::new(x, y, 'o', "orc", DESATURATED_GREEN, true)
+                let mut orc = Object::new(x, y, 'o', "orc", DESATURATED_GREEN, true);
+                orc.fighter = Some(Fighter {
+                    max_hp: 10,
+                    hp: 10,
+                    defense: 0,
+                    power: 3,
+                });
+                orc.ai = Some(Ai::Basic);
+                orc
             } else {
-                Object::new(x, y, 'T', "troll", DARKER_GREEN, true)
+                let mut troll = Object::new(x, y, 'T', "troll", DARKER_GREEN, true);
+                troll.fighter = Some(Fighter {
+                    max_hp: 16,
+                    hp: 16,
+                    defense: 1,
+                    power: 4,
+                });
+                troll.ai = Some(Ai::Basic);
+                troll
             };
             
             monster.alive = true;
