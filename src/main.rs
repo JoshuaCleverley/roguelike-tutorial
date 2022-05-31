@@ -1,5 +1,6 @@
 use std::cmp;
 use rand::Rng;
+use tcod::map::{FovAlgorithm, Map as FovMap};
 use tcod::colors::*;
 use tcod::console::*;
 
@@ -15,17 +16,33 @@ const ROOM_MAX_SIZE: i32 = 10;
 const ROOM_MIN_SIZE: i32 = 6;
 const MAX_ROOMS: i32 = 30;
 
+const FOV_ALGO: FovAlgorithm = FovAlgorithm::Basic;
+const FOV_LIGHT_WALLS: bool = true;
+const TORCH_RADIUS: i32 = 10;
+
 const COLOR_DARK_WALL: Color = 
     Color { 
         r: 0, 
         g: 0, 
-        b: 100 
+        b: 100,
+    };
+const COLOR_LIGHT_WALL: Color = 
+    Color {
+        r: 130,
+        g: 110,
+        b: 50,
     };
 const COLOR_DARK_GROUND: Color = 
     Color { 
         r: 50, 
         g: 50, 
-        b: 150 
+        b: 150, 
+    };
+const COLOR_LIGHT_GROUND: Color =
+    Color {
+        r: 200,
+        g: 180,
+        b: 50,
     };
 
 fn main() {
@@ -178,9 +195,7 @@ fn make_map(player: &mut Object) -> Map {
             }
             rooms.push(new_room);
         }
-    };
-
-    map
+    } map
 }
 
 fn render_all(tcod: &mut Tcod, game: &Game, objects: &[Object]) {
